@@ -197,7 +197,7 @@ Resources:
         - IpProtocol: tcp 
           FromPort: '22'
           ToPort: '22'
-          SourcePrefixListId: com.amazonaws.eu-west-2.ipv6.ec2-instance-connect      # Allow EC2 Instance Connect from the eu-west-2 region
+          SourcePrefixListId: pl-067eefa539e593d55      # Allow EC2 Instance Connect from the eu-west-2 region
       Tags:
         - Key: Name
           Value: EC2 Security Group
