@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This template creates a VPC
+
+# The following metadata is used to group the parameters
+Metadata:
+  AWS::CloudFormation::Interface: 
+    ParameterGroups:
+      - 
+        Label: 
+          default: "VPC"
+        Parameters: 
+          - VpcName
+      - 
+        Label: 
+          default: "VPC CIDR"
+        Parameters: 
+          - VpcCIDR
+      - 
+        Label: 
+          default: "Subnet CIDR"
+        Parameters:
+          - Subnet1CIDR
+          - Subnet2CIDR
+          - Subnet3CIDR
+
+# Parameters are used to to build flexible CloudFormation templates
+Parameters:
+      VpcName:
+        Default: VPC
+        Description: Please enter a name for this VPC
+        Type: String
+
+      VpcCIDR:
+        Default: 10.0.0.0/16
+        Description: Please enter the IP range (CIDR notation) for this VPC
+        Type: String
+      
+      Subnet1CIDR:
+        Default: 10.0.1.0/24
+        Description: Please enter the IP range (CIDR notation) for Subnet1
+        Type: String
+
+      Subnet2CIDR:
+        Default: 10.0.2.0/24
+        Description: Please enter the IP range (CIDR notation) for Subnet2
+        Type: String
+
+      Subnet3CIDR:
+        Default: 10.0.3.0/24
+        Description: Please enter the IP range (CIDR notation) for Subnet3
+        Type: String
+
+
+Resources:
+
+#############################################################################
+#
+# Setup the VPC, Subnets, NAT gateway and EIP's etc
+#
+#############################################################################
+
+  # Create VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Ref VpcName
+
+# Create Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: InternetGateway
+
+# Attach Internet Gateway to VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+# Create Subnet1
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref Subnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Subnet1
+      VpcId: !Ref VPC
+
+# Create Subnet2
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref Subnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Subnet2
+      VpcId: !Ref VPC
+
+# Create Subnet3
+  Subnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: !Ref Subnet3CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Subnet3
+      VpcId: !Ref VPC
+
+# Create Route Table
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: RouteTable
+      VpcId: !Ref VPC
+
+# Add a Public Route to the Table
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+# Associate Subnet1 with Public Route Table
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet1
+
+# Associate Subnet2 with Public Route Table
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet2
+
+# Associate Subnet3 with Public Route Table
+  Subnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet3
+
+#############################################################################
+#
+# Setup the Security Groups
+#
+#############################################################################
+
+
+# Create Security Group for the EC2 servers
+  EC2SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable various ingresss and egress rules
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0                              # HTTP from the world
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0                              # HTTPS from the world
+        # - IpProtocol: tcp
+        #   FromPort: '22'
+        #   ToPort: '22'
+        #   CidrIp: 10.10.10.10/30                       # SSH from a specific IP
+        - IpProtocol: tcp
+          FromPort: '2049'
+          ToPort: '2049'
+          CidrIp: 10.0.0.0/16                            # NFS to VPC
+        # - IpProtocol: tcp 
+        #   FromPort: '22'
+        #   ToPort: '22'
+        #   SourcePrefixListId: pl-067eefa539e593d55      # Allow EC2 Instance Connect from the eu-west-2 region
+        - IpProtocol: tcp 
+          FromPort: '22'
+          ToPort: '22'
+          SourcePrefixListId: com.amazonaws.eu-west-2.ipv6.ec2-instance-connect      # Allow EC2 Instance Connect from the eu-west-2 region
+      Tags:
+        - Key: Name
+          Value: EC2 Security Group
+      VpcId: !Ref VPC
+
+Outputs:
+# Export VPC ID
+  VPC:
+    Description: VPC ID
+    Export:
+      Name: VPC
+    Value: !Ref VPC
+
+# Export Subnet 1
+  Subnet1:
+    Description: Subnet 1 ID
+    Export:
+      Name: Subnet1
+    Value: !Ref Subnet1
+
+# Export Subnet 2
+  Subnet2:
+    Description: Subnet 2 ID
+    Export:
+      Name: Subnet2
+    Value: !Ref Subnet2
+
+# Export Subnet 3
+  Subnet3:
+    Description: Subnet 3 ID
+    Export:
+      Name: Subnet3
+    Value: !Ref Subnet3
+
+# Export the Security Group ID
+  EC2SecurityGroup:
+    Description: EC2 Security Group ID
+    Export:
+      Name: EC2SecurityGroup
+    Value: !Ref EC2SecurityGroup
+
+
+
+
+
