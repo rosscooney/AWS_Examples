@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This template creates a FSx OpenZFS file system 
+
+Resources:
+  SharedFS:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: OPENZFS
+      OpenZFSConfiguration: 
+          AutomaticBackupRetentionDays: 30
+          DailyAutomaticBackupStartTime: '01:00'
+          DeploymentType: SINGLE_AZ_1
+          PreferredSubnetId: !ImportValue Subnet1
+          WeeklyMaintenanceStartTime: '1:05:00'
+          ThroughputCapacity: 64
+      SecurityGroupIds:
+        - !ImportValue  EC2SecurityGroup
+      StorageCapacity: 64
+      StorageType: SSD
+      SubnetIds: 
+        - !ImportValue Subnet1
+      Tags: 
+        - Key: Name
+          Value: SharedFS
+
+Outputs:
+# Export File System ID
+  SharedFS:
+    Description: SharedFS
+    Export:
+      Name: SharedFS
+    Value: !Ref SharedFS
+
+    
